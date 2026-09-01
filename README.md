@@ -131,7 +131,7 @@ o backend já aceita CORS dessas três portas).
 ## Estrutura
 
 ```
-gpt-context/
+SportSphere/
 ├── .gitignore
 ├── docker-compose.yml      # orquestra ollama + backend + frontend
 ├── docs/
