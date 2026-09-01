@@ -1,5 +1,7 @@
 # SportSphere — React + Python
 
+📄 **Landing page:** [`docs/index.html`](docs/index.html) — página de apresentação do projeto, estática e sem dependências. Para a publicar, ativa o GitHub Pages em *Settings → Pages* com a source `main` / `/docs`.
+
 Assistente desportivo local com RAG sobre `local-docs/`, deteção automática
 de desporto, e respostas em streaming via Ollama. Arquitetura dividida em:
 
@@ -132,6 +134,8 @@ o backend já aceita CORS dessas três portas).
 gpt-context/
 ├── .gitignore
 ├── docker-compose.yml      # orquestra ollama + backend + frontend
+├── docs/
+│   └── index.html          # landing page do projeto (GitHub Pages)
 ├── backend/
 │   ├── Dockerfile
 │   ├── .dockerignore

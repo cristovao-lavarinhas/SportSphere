@@ -1,0 +1,1373 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SportSphere</title>
+<meta name="description" content="Assistente desportivo com RAG local: indexa os teus documentos, deteta o desporto pela pergunta e responde com um modelo que corre na tua própria máquina." />
+<meta property="og:title" content="SportSphere" />
+<meta property="og:description" content="RAG desportivo 100% local. React + FastAPI + Ollama, sem uma única chamada à cloud." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wght@600;700;800&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+<style>
+/* ============================================================
+   SportSphere — landing
+   Palette: instrument panel. Deep blue-biased neutrals, one cyan
+   accent from the logo gradient, lime reserved for a single signal
+   (o estado "local / offline"). Both themes built from tokens.
+   ============================================================ */
+
+:root {
+  --ground:      #f5f8fd;
+  --ground-deep: #eaeff8;
+  --surface:     #ffffff;
+  --surface-2:   #f0f4fb;
+  --rule:        #d9e2f0;
+  --rule-soft:   #e7edf7;
+  --ink:         #0d1524;
+  --ink-2:       #33405a;
+  --dim:         #616e88;
+
+  --cyan:        #0b7f9c;
+  --cyan-bright: #12a8ca;
+  --blue:        #1348a8;
+  --signal-text: #5c7500;
+  --signal-fill: #d7f45a;
+  --signal-ink:  #1c2600;
+
+  --shadow: 0 1px 2px rgba(13, 21, 36, .05), 0 12px 34px -18px rgba(13, 21, 36, .28);
+
+  --font-display: 'Anybody', 'Archivo', system-ui, sans-serif;
+  --font-body: 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --maxw: 1120px;
+  --rail: 148px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0a0e16;
+    --ground-deep: #06090f;
+    --surface:     #121926;
+    --surface-2:   #18212f;
+    --rule:        #232e40;
+    --rule-soft:   #1a2432;
+    --ink:         #e9eef8;
+    --ink-2:       #b9c4d7;
+    --dim:         #808da5;
+
+    --cyan:        #35c9e8;
+    --cyan-bright: #5fdcf5;
+    --blue:        #4f8cf5;
+    --signal-text: #c6f52c;
+    --signal-fill: #c6f52c;
+    --signal-ink:  #0a0e16;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 44px -20px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #0a0e16;
+  --ground-deep: #06090f;
+  --surface:     #121926;
+  --surface-2:   #18212f;
+  --rule:        #232e40;
+  --rule-soft:   #1a2432;
+  --ink:         #e9eef8;
+  --ink-2:       #b9c4d7;
+  --dim:         #808da5;
+
+  --cyan:        #35c9e8;
+  --cyan-bright: #5fdcf5;
+  --blue:        #4f8cf5;
+  --signal-text: #c6f52c;
+  --signal-fill: #c6f52c;
+  --signal-ink:  #0a0e16;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 44px -20px rgba(0, 0, 0, .8);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+img, svg { max-width: 100%; }
+
+/* ---------- shell ---------- */
+
+.wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.section {
+  border-top: 1px solid var(--rule);
+  padding: 76px 0;
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  gap: 0 44px;
+  align-items: start;
+}
+
+.section > .body { min-width: 0; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: .69rem;
+  font-weight: 500;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0;
+  padding-top: .55rem;
+}
+
+.eyebrow::before {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--cyan);
+  margin-bottom: 14px;
+}
+
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.65rem, 3.1vw, 2.3rem);
+  letter-spacing: -.025em;
+  line-height: 1.08;
+}
+
+.lede {
+  color: var(--ink-2);
+  font-size: 1.05rem;
+  max-width: 62ch;
+  margin: 18px 0 0;
+}
+
+.note {
+  color: var(--dim);
+  font-size: .92rem;
+  max-width: 66ch;
+}
+
+code, kbd { font-family: var(--font-mono); font-size: .86em; }
+
+.section .body > * + * { margin-top: 28px; }
+.section .body > h2 + .lede { margin-top: 16px; }
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--ground) 86%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.masthead .wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 62px;
+}
+
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.06rem;
+  letter-spacing: -.02em;
+}
+
+.lockup .sphere {
+  background: linear-gradient(96deg, var(--cyan-bright), var(--blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.mark { width: 26px; height: 26px; flex: none; }
+
+.masthead nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: .88rem;
+}
+
+.masthead nav a { color: var(--dim); text-decoration: none; }
+.masthead nav a:hover { color: var(--ink); }
+
+@media (max-width: 720px) { .masthead nav .hide-sm { display: none; } }
+
+/* ---------- hero ---------- */
+
+.hero {
+  padding: 72px 0 84px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 56px;
+  align-items: center;
+}
+
+.hero-kicker {
+  font-family: var(--font-mono);
+  font-size: .69rem;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 26px;
+}
+
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--signal-text);
+  flex: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal-text) 22%, transparent);
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 5.6vw, 4.05rem);
+  line-height: .97;
+  letter-spacing: -.038em;
+}
+
+h1 em {
+  font-style: normal;
+  background: linear-gradient(102deg, var(--cyan-bright), var(--blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero p.lede { font-size: 1.1rem; margin-top: 24px; }
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 20px;
+  border-radius: 7px;
+  font-family: var(--font-body);
+  font-size: .93rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--ground);
+  border-color: var(--ink);
+}
+.btn-primary:hover { transform: translateY(-1px); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule);
+}
+.btn-ghost:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* readout strip */
+
+.readout {
+  margin-top: 44px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.readout div {
+  padding: 16px 14px 16px 0;
+  border-right: 1px solid var(--rule-soft);
+}
+.readout div:last-child { border-right: 0; }
+
+.readout b {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.12rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+
+.readout span {
+  display: block;
+  font-size: .74rem;
+  color: var(--dim);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 44px; padding-top: 48px; }
+  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .readout div:nth-child(2) { border-right: 0; }
+}
+
+/* ---------- app mockup ---------- */
+
+.mock {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: 158px minmax(0, 1fr);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* a sidebar da app real é sempre escura, nos dois temas */
+.mock-side {
+  background: #0d0e12;
+  color: #e3e2e7;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 400px;
+}
+
+.mock-side .lockup { font-size: .84rem; color: #fff; }
+.mock-side .mark { width: 20px; height: 20px; }
+
+.mock-newchat {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #e3e2e7;
+  background: #1a1b1f;
+  font-size: 11.5px;
+}
+
+.mock-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #8c90a1;
+  margin-top: 4px;
+}
+
+.mock-hist { display: flex; flex-direction: column; gap: 3px; }
+
+.mock-hist span {
+  padding: 6px 9px;
+  border-radius: 5px;
+  color: #b6bacb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mock-hist span.on { background: #1e1f23; color: #fff; }
+
+.mock-status {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  color: #8c90a1;
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding-top: 11px;
+}
+
+.mock-status i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #c3f400;
+  box-shadow: 0 0 8px #c3f400;
+  flex: none;
+}
+
+.mock-main {
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.bubble-user {
+  align-self: flex-end;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-soft);
+  border-radius: 12px 12px 3px 12px;
+  padding: 8px 12px;
+  max-width: 84%;
+  color: var(--ink);
+}
+
+.mock-sources {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .04em;
+  color: var(--cyan);
+  border: 1px solid color-mix(in srgb, var(--cyan) 32%, transparent);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.bubble-bot {
+  align-self: flex-start;
+  max-width: 94%;
+  color: var(--ink-2);
+}
+
+.bubble-bot strong { color: var(--ink); }
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  background: var(--cyan);
+  vertical-align: -2px;
+  margin-left: 2px;
+  animation: blink 1.05s steps(2, start) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+.mock-input {
+  margin-top: auto;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ground);
+}
+
+.mock-send {
+  margin-left: auto;
+  width: 21px; height: 21px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--cyan-bright), var(--blue));
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .mock { grid-template-columns: minmax(0, 1fr); }
+  .mock-side { display: none; }
+}
+
+/* ---------- scope demo ---------- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip {
+  font-family: var(--font-body);
+  font-size: .855rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+
+.chip:hover { border-color: var(--cyan); color: var(--ink); }
+
+.chip[aria-pressed="true"] {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 11%, var(--surface));
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.panel {
+  border: 1px solid var(--rule);
+  border-radius: 11px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.panel-head {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--surface-2);
+}
+
+.trace { padding: 6px 0; }
+
+.trace-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 18px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: baseline;
+}
+
+.trace-row:last-child { border-bottom: 0; }
+
+.trace-row dt {
+  font-family: var(--font-mono);
+  font-size: .69rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.trace-row dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: .84rem;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--cyan) 15%, transparent);
+  color: var(--cyan);
+  border: 1px solid color-mix(in srgb, var(--cyan) 30%, transparent);
+}
+
+.tag-signal {
+  background: var(--signal-fill);
+  color: var(--signal-ink);
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.tag-void {
+  background: transparent;
+  color: var(--dim);
+  border-color: var(--rule);
+}
+
+.trace-row dd em {
+  font-style: normal;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--cyan) 20%, transparent);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+@media (max-width: 640px) {
+  .trace-row { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+}
+
+/* ---------- pipeline ---------- */
+
+.stages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: stage;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 20px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+.stage.in { opacity: 1; transform: none; }
+.stage:last-child { border-bottom: 0; }
+
+.stage::before {
+  counter-increment: stage;
+  content: counter(stage, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan);
+  padding-top: 2px;
+}
+
+.stage h3 {
+  font-family: var(--font-body);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.stage p { margin: 6px 0 0; color: var(--ink-2); font-size: .95rem; max-width: 64ch; }
+
+.stage .meta {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: .73rem;
+  color: var(--dim);
+  letter-spacing: .02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage { opacity: 1; transform: none; transition: none; }
+  .caret { animation: none; }
+  * { scroll-behavior: auto !important; }
+}
+
+/* ---------- scoring ---------- */
+
+.formula { display: flex; flex-direction: column; gap: 2px; }
+
+.f-row {
+  display: grid;
+  grid-template-columns: 210px 78px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.f-row:last-child { border-bottom: 0; }
+
+.f-row .name { font-size: .93rem; font-weight: 600; }
+.f-row .name small { display: block; font-weight: 400; color: var(--dim); font-size: .78rem; font-family: var(--font-mono); }
+
+.f-row .pct {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bar { height: 9px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--rule-soft); }
+
+.bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cyan-bright), var(--blue));
+  transition: width .85s cubic-bezier(.2, .7, .3, 1);
+}
+
+.f-row.bonus .bar i { background: var(--signal-fill); }
+.f-row.bonus .pct { color: var(--signal-text); }
+
+@media (max-width: 620px) {
+  .f-row { grid-template-columns: minmax(0, 1fr) 62px; gap: 4px 12px; }
+  .f-row .bar { grid-column: 1 / -1; }
+}
+
+.callout {
+  border-left: 2px solid var(--cyan);
+  padding: 4px 0 4px 20px;
+  color: var(--ink-2);
+  font-size: .96rem;
+  max-width: 64ch;
+}
+
+/* ---------- feature grid ---------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.cell { background: var(--surface); padding: 22px 20px; }
+
+.cell h3 {
+  font-family: var(--font-body);
+  font-size: .96rem;
+  font-weight: 700;
+  letter-spacing: -.005em;
+}
+
+.cell p { margin: 7px 0 0; font-size: .89rem; color: var(--ink-2); }
+
+.cell .n {
+  font-family: var(--font-mono);
+  font-size: .67rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  display: block;
+  margin-bottom: 9px;
+}
+
+/* ---------- stack ---------- */
+
+.stack {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 30px 26px;
+}
+
+.stack h3 {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 10px;
+}
+
+.stack ul { list-style: none; margin: 0; padding: 0; }
+.stack li { font-size: .91rem; padding: 3px 0; color: var(--ink-2); }
+.stack li b { color: var(--ink); font-weight: 600; }
+
+/* ---------- code ---------- */
+
+.code {
+  background: var(--ground-deep);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 18px 20px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  line-height: 1.85;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.code .c { color: var(--dim); }
+.code .p { color: var(--cyan); user-select: none; }
+.code b { color: var(--ink); font-weight: 500; }
+
+/* ---------- footer ---------- */
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 46px 0 60px;
+  margin-top: 0;
+}
+
+.foot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px 40px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.foot-grid p { margin: 0; font-size: .87rem; color: var(--dim); max-width: 46ch; }
+.foot-grid a { color: var(--cyan); text-decoration: none; }
+.foot-grid a:hover { text-decoration: underline; }
+
+@media (max-width: 860px) {
+  .section { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 58px 0; }
+  .eyebrow { padding-top: 0; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="ss-grad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#48cfe8" />
+      <stop offset="1" stop-color="#1348a8" />
+    </linearGradient>
+    <g id="ss-mark">
+      <g fill="url(#ss-grad)" stroke="url(#ss-grad)" stroke-width="3.2" stroke-linejoin="round">
+        <polygon points="11.8,9.1 31.5,9.1 19.9,44.7 0.2,44.7" />
+        <polygon points="41.0,2.4 60.5,2.4 52.2,25.4 32.5,25.4" />
+        <polygon points="31.5,29.0 47.7,29.0 32.1,61.5 15.2,61.5" />
+      </g>
+    </g>
+  </defs>
+</svg>
+
+<header class="masthead">
+  <div class="wrap">
+    <a class="lockup" href="#top">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#ss-mark" /></svg>
+      <span>Sport<span class="sphere">Sphere</span></span>
+    </a>
+    <nav>
+      <a class="hide-sm" href="#scope">Scope</a>
+      <a class="hide-sm" href="#pipeline">Pipeline</a>
+      <a class="hide-sm" href="#scoring">Scoring</a>
+      <a class="hide-sm" href="#stack">Stack</a>
+      <a href="https://github.com/cristovao-lavarinhas/gpt-context">GitHub&nbsp;&rarr;</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <section class="wrap hero">
+    <div>
+      <p class="hero-kicker"><span class="dot"></span> 100% local &middot; 0 chamadas externas</p>
+
+      <h1>Responde só a partir dos <em>teus</em> ficheiros.</h1>
+
+      <p class="lede">
+        SportSphere é um assistente desportivo com RAG local. Indexa a tua pasta de
+        documentos, deteta o desporto pela própria pergunta, restringe a busca à pasta
+        certa e responde em streaming — com um modelo que corre na tua máquina.
+        Quando o contexto não chega, recusa em vez de inventar.
+      </p>
+
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/cristovao-lavarinhas/gpt-context">Ver o código no GitHub</a>
+        <a class="btn btn-ghost" href="#pipeline">Como funciona</a>
+      </div>
+
+      <div class="readout">
+        <div><b>0</b><span>chamadas a APIs externas</span></div>
+        <div><b>900 / 150</b><span>caracteres por chunk / sobreposição</span></div>
+        <div><b>60 s</b><span>TTL da cache de indexação</span></div>
+        <div><b>PT &harr; EN</b><span>query traduzida antes da busca</span></div>
+      </div>
+    </div>
+
+    <div class="mock" role="img" aria-label="Interface do SportSphere: sidebar escura com histórico de conversas e painel de chat com uma resposta em streaming.">
+      <div class="mock-side">
+        <span class="lockup">
+          <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#ss-mark" /></svg>
+          <span>Sport<span class="sphere">Sphere</span></span>
+        </span>
+        <div class="mock-newchat">+&nbsp; Novo Chat</div>
+        <div class="mock-label">Recentes</div>
+        <div class="mock-hist">
+          <span class="on">Regras da NBA e FIBA</span>
+          <span>Pneus e bandeiras na F1</span>
+          <span>Grand Slams de ténis</span>
+        </div>
+        <div class="mock-status"><i></i> qwen2.5:3b &nbsp;disponível</div>
+      </div>
+
+      <div class="mock-main">
+        <div class="bubble-user">Quantos jogadores tem uma equipa de futebol em campo?</div>
+        <div class="mock-sources">a consultar: soccer/Leis-do-Jogo-2025_26-PT.pdf</div>
+        <div class="bubble-bot"><span id="typed"></span><span class="caret" aria-hidden="true"></span></div>
+        <div class="mock-input">Pergunta alguma coisa&hellip;<span class="mock-send"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCOPE ============ -->
+  <section class="wrap section" id="scope">
+    <p class="eyebrow">Scope</p>
+    <div class="body">
+      <h2>A pergunta escolhe a pasta.</h2>
+      <p class="lede">
+        Antes de procurar o que quer que seja, o backend lê a pergunta à procura de
+        palavras-chave em português e inglês. O desporto que encontra decide qual das
+        pastas de <code>local-docs/</code> entra na busca — o resto do corpus fica de fora.
+        O corpus versionado no repo são regulamentos oficiais em PDF — as Leis do Jogo da IFAB, o NFL Rulebook, as Rules of Tennis da ITF, o regulamento desportivo da FIA. Escolhe uma pergunta e vê o trace:
+      </p>
+
+      <div class="chips" id="chips" role="group" aria-label="Exemplos de perguntas"></div>
+
+      <div class="panel">
+        <div class="panel-head">Detection trace</div>
+        <dl class="trace" id="trace"></dl>
+      </div>
+
+      <p class="note">
+        A ordem da lista de keywords não é acidental: <code>Football</code> (NFL) tem de ser
+        testado antes de <code>Soccer</code>, porque &ldquo;futebol americano&rdquo; contém
+        &ldquo;futebol&rdquo; e o primeiro match ganha. Também dá para forçar o scope à mão,
+        escrevendo <code>[folders: soccer]</code> na própria mensagem.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ PIPELINE ============ -->
+  <section class="wrap section" id="pipeline">
+    <p class="eyebrow">Pipeline</p>
+    <div class="body">
+      <h2>Da pergunta ao primeiro token.</h2>
+      <p class="lede">
+        Seis passos, todos dentro da tua máquina. O React só desenha — não tem permissões
+        para ler ficheiros locais nem falar com o Ollama, por isso toda a lógica vive no
+        FastAPI.
+      </p>
+
+      <ol class="stages">
+        <li class="stage">
+          <div>
+            <h3>Deteção de desporto</h3>
+            <p>Keywords PT/EN sobre o texto normalizado (Unicode NFKD, sem acentos) identificam a liga e mapeiam-na para uma pasta.</p>
+            <span class="meta">rag.py · _detect_sport()</span>
+          </div>
+        </li>
+        <li class="stage">
+          <div>
+            <h3>Tradução da query PT&rarr;EN</h3>
+            <p>O próprio Ollama traduz a pergunta. Os tokens das duas línguas são unidos, o que permite acertar em documentos ingleses a partir de perguntas em português.</p>
+            <span class="meta">rag.py · translate_query_for_rag()</span>
+          </div>
+        </li>
+        <li class="stage">
+          <div>
+            <h3>Indexação e chunking</h3>
+            <p>Cada ficheiro suportado é lido, partido em blocos de 900 caracteres com 150 de sobreposição, e tokenizado uma vez. O índice fica em cache 60&nbsp;segundos e é invalidado sempre que a app mexe nos documentos.</p>
+            <span class="meta">CHUNK_SIZE 900 · CHUNK_OVERLAP 150 · TTL 60s</span>
+          </div>
+        </li>
+        <li class="stage">
+          <div>
+            <h3>Scoring e ranking</h3>
+            <p>Só os chunks dentro do scope são pontuados. Os 10 melhores seguem para o prompt — junto com os excertos exatos que a UI mostra no &ldquo;a consultar:&nbsp;…&rdquo;.</p>
+            <span class="meta">max_chunks 10 · dedup por ficheiro para a UI</span>
+          </div>
+        </li>
+        <li class="stage">
+          <div>
+            <h3>System prompt em modo estrito</h3>
+            <p>O contexto recuperado, o ficheiro anexado pelo utilizador e o scope ativo são montados num system prompt que proíbe conhecimento externo. Sem contexto, a resposta é uma frase fixa de recusa.</p>
+            <span class="meta">LOCAL_RAG_STRICT_ONLY=true</span>
+          </div>
+        </li>
+        <li class="stage">
+          <div>
+            <h3>Streaming via SSE</h3>
+            <p>O FastAPI reencaminha a resposta do Ollama token a token por Server-Sent Events. Parar a meio guarda no histórico o texto já gerado.</p>
+            <span class="meta">POST /api/chat · text/event-stream</span>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ SCORING ============ -->
+  <section class="wrap section" id="scoring">
+    <p class="eyebrow">Scoring</p>
+    <div class="body">
+      <h2>Retrieval sem embeddings.</h2>
+      <p class="lede">
+        Não há vector store, não há modelo de embeddings, não há índice a construir.
+        A relevância de cada chunk é uma soma ponderada de quatro sinais lexicais,
+        calculada em Python puro sobre conjuntos de tokens — corre em CPU, arranca
+        instantaneamente e é totalmente inspecionável.
+      </p>
+
+      <div class="formula" id="formula">
+        <div class="f-row" data-w="65">
+          <span class="name">Similaridade léxica<small>|q &cap; c| / &radic;(|q|&middot;|c|)</small></span>
+          <span class="pct">0.65</span>
+          <span class="bar"><i></i></span>
+        </div>
+        <div class="f-row" data-w="15">
+          <span class="name">Cobertura da query<small>quanto da pergunta aparece</small></span>
+          <span class="pct">0.15</span>
+          <span class="bar"><i></i></span>
+        </div>
+        <div class="f-row" data-w="15">
+          <span class="name">Bigramas<small>pares de tokens em comum</small></span>
+          <span class="pct">0.15</span>
+          <span class="bar"><i></i></span>
+        </div>
+        <div class="f-row" data-w="5">
+          <span class="name">Nome do ficheiro<small>tokens do próprio caminho</small></span>
+          <span class="pct">0.05</span>
+          <span class="bar"><i></i></span>
+        </div>
+        <div class="f-row bonus" data-w="10">
+          <span class="name">Bónus de frase exata<small>aditivo, fora dos pesos</small></span>
+          <span class="pct">+0.10</span>
+          <span class="bar"><i></i></span>
+        </div>
+      </div>
+
+      <p class="callout">
+        O trade-off é assumido: um scorer lexical falha sinónimos que um modelo de
+        embeddings apanharia. A tradução PT&rarr;EN existe precisamente para recuperar
+        a maior parte dessa perda — sem nunca introduzir uma dependência que precise de
+        rede ou de GPU.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="wrap section" id="app">
+    <p class="eyebrow">Na app</p>
+    <div class="body">
+      <h2>Não é só um chat.</h2>
+
+      <div class="grid">
+        <div class="cell">
+          <span class="n">Chat</span>
+          <h3>Streaming, Markdown e edição</h3>
+          <p>Resposta token a token, listas e tabelas renderizadas, copiar com um clique, editar e reenviar uma mensagem anterior (corta a conversa a partir daí) ou parar a geração a meio.</p>
+        </div>
+        <div class="cell">
+          <span class="n">Transparência</span>
+          <h3>&ldquo;a consultar: …&rdquo;</h3>
+          <p>Um painel expansível mostra os excertos exatos de cada ficheiro que entraram no prompt. Dá para verificar a resposta contra a fonte sem sair da conversa.</p>
+        </div>
+        <div class="cell">
+          <span class="n">Documentos</span>
+          <h3>Biblioteca gerida pela UI</h3>
+          <p>Criar pastas para desportos novos, carregar e apagar ficheiros, tudo sem tocar no disco à mão. As 7 pastas originais estão protegidas — a deteção automática depende delas.</p>
+        </div>
+        <div class="cell">
+          <span class="n">Ingestão</span>
+          <h3>OCR em cascata</h3>
+          <p>PDF via pypdf, DOCX via python-docx, texto direto. Imagens tentam Tesseract primeiro; se não estiver instalado, caem para o modelo de visão do Ollama. Limite de 5&nbsp;MB por ficheiro.</p>
+        </div>
+        <div class="cell">
+          <span class="n">Honestidade</span>
+          <h3>Recusa controlada pelo backend</h3>
+          <p>Sem contexto suficiente, a resposta é sempre a mesma frase — imposta pelo prompt em modo estrito, não deixada ao critério do modelo.</p>
+        </div>
+        <div class="cell">
+          <span class="n">Interface</span>
+          <h3>Tema claro e escuro</h3>
+          <p>Preferência guardada no browser. A sidebar mantém-se escura nos dois temas, como âncora visual fixa. Página de arquitetura embutida na própria app.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STACK ============ -->
+  <section class="wrap section" id="stack">
+    <p class="eyebrow">Stack</p>
+    <div class="body">
+      <h2>Três processos, uma máquina.</h2>
+      <p class="lede">
+        React em <code>:5173</code>, FastAPI em <code>:8000</code>, Ollama em <code>:11434</code>.
+        O <code>docker-compose.yml</code> orquestra os três, com <code>local-docs/</code> e o
+        histórico montados como volumes para sobreviverem aos rebuilds.
+      </p>
+
+      <div class="stack">
+        <div>
+          <h3>Backend</h3>
+          <ul>
+            <li><b>Python</b> 3.11+</li>
+            <li><b>FastAPI</b> + Uvicorn</li>
+            <li>SSE streaming</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Frontend</h3>
+          <ul>
+            <li><b>React</b> 18</li>
+            <li><b>Vite</b> 5</li>
+            <li>react-markdown + GFM</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Modelo</h3>
+          <ul>
+            <li><b>Ollama</b> local</li>
+            <li>qwen2.5:3b</li>
+            <li>Vision como fallback de OCR</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Ingestão</h3>
+          <ul>
+            <li><b>pypdf</b></li>
+            <li><b>python-docx</b></li>
+            <li>Pillow + pytesseract</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Persistência</h3>
+          <ul>
+            <li>chat_history.json</li>
+            <li>local-docs/ no disco</li>
+            <li>Volumes Docker</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RUN ============ -->
+  <section class="wrap section" id="run">
+    <p class="eyebrow">Correr</p>
+    <div class="body">
+      <h2>Três comandos.</h2>
+      <p class="lede">
+        Com o Docker Desktop a correr, não precisas de instalar Python, Node nem o Ollama
+        no sistema.
+      </p>
+
+      <pre class="code"><span class="c"># o ficheiro de histórico tem de existir antes do primeiro arranque</span>
+<span class="p">&gt;</span> <b>Set-Content backend\chat_history.json "[]"</b>
+
+<span class="c"># constrói e arranca ollama + backend + frontend</span>
+<span class="p">&gt;</span> <b>docker compose up -d --build</b>
+
+<span class="c"># puxa o modelo para dentro do container (só na primeira vez)</span>
+<span class="p">&gt;</span> <b>docker compose exec ollama ollama pull qwen2.5:3b</b></pre>
+
+      <p class="note">
+        Depois abre <code>http://localhost:5173</code>. Há também um modo manual, sem
+        Docker, com três terminais — útil para debug sem rebuild de imagem a cada
+        alteração. Os dois estão documentados no README.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <a class="lockup" href="#top" style="margin-bottom:10px">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#ss-mark" /></svg>
+        <span>Sport<span class="sphere">Sphere</span></span>
+      </a>
+      <p>Projeto académico &mdash; Análise e Orientação a Objetos, 2025/2026.<br />Cristóvão Lavarinhas.</p>
+    </div>
+    <p>
+      <a href="https://github.com/cristovao-lavarinhas/gpt-context">github.com/cristovao-lavarinhas/gpt-context</a>
+    </p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- streaming demo no mockup ---------- */
+
+  var ANSWER = "Onze. Cada equipa entra em campo com 11 jogadores, incluindo o guarda-redes.";
+  var typed = document.getElementById("typed");
+
+  function stream(el, text) {
+    if (reduce) { el.textContent = text; return; }
+    var i = 0;
+    (function tick() {
+      el.textContent = text.slice(0, ++i);
+      if (i < text.length) setTimeout(tick, 26);
+    })();
+  }
+
+  /* ---------- deteção de desporto ---------- */
+
+  var EXAMPLES = [
+    {
+      label: "Regras do futebol",
+      q: "Quantos jogadores tem uma equipa de futebol?",
+      hit: "futebol",
+      sport: "Soccer",
+      folder: "soccer/",
+      files: "Leis-do-Jogo-2025_26-PT.pdf · FWC26_regulations_v16.pdf",
+      note: "Match direto na lista de keywords do Soccer."
+    },
+    {
+      label: "Futebol americano",
+      q: "O que conta como touchdown no futebol americano?",
+      hit: "futebol americano",
+      sport: "Football (NFL)",
+      folder: "nfl/",
+      files: "2025-nfl-rulebook-final.pdf",
+      note: "Testado antes do Soccer — senão “futebol” apanhava a pergunta primeiro."
+    },
+    {
+      label: "Grand Slam",
+      q: "Como funcionam os torneios Grand Slam?",
+      hit: "grand slam",
+      sport: "Tennis",
+      folder: "tennis/",
+      files: "2026-rules-of-tennis-english.pdf",
+      note: "Keyword de duas palavras, procurada sobre o texto normalizado e sem acentos."
+    },
+    {
+      label: "Pneus de F1",
+      q: "Que tipos de pneus existem na F1?",
+      hit: "f1",
+      sport: "Formula1",
+      folder: "formula1/",
+      files: "fia_2025_formula_1_sporting_regulations.pdf",
+      note: "Abreviaturas contam como keywords: f1, fia, gp, grand prix."
+    },
+    {
+      label: "Pasta criada na UI",
+      q: "[folders: hoquei-no-gelo] Como funciona o formato 3x3?",
+      hit: "[folders: hoquei-no-gelo]",
+      sport: null,
+      folder: "hoquei-no-gelo/",
+      files: "Regulamento-Campeonato-Nacional-Hoquei-no-Gelo-3x3-2024.pdf",
+      note: "Hóquei no gelo não está na lista de keywords, por isso a deteção automática falha — o scope é forçado à mão na própria mensagem."
+    },
+    {
+      label: "Sem cobertura",
+      q: "Quem ganhou o Rugby Championship?",
+      hit: null,
+      sport: null,
+      folder: null,
+      files: null,
+      note: "Sem desporto detetado a busca corre em todas as pastas — e como nenhuma cobre ráguebi, o modo estrito devolve a frase fixa de recusa."
+    }
+  ];
+
+  var chips = document.getElementById("chips");
+  var trace = document.getElementById("trace");
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function row(label, html) {
+    return "<div class=\"trace-row\"><dt>" + label + "</dt><dd>" + html + "</dd></div>";
+  }
+
+  function render(ex) {
+    var query = esc(ex.q);
+    if (ex.hit) {
+      var i = ex.q.toLowerCase().indexOf(ex.hit.toLowerCase());
+      if (i >= 0) {
+        query = esc(ex.q.slice(0, i)) + "<em>" + esc(ex.q.slice(i, i + ex.hit.length)) + "</em>" + esc(ex.q.slice(i + ex.hit.length));
+      }
+    }
+
+    trace.innerHTML =
+      row("query", query) +
+      row("keyword", ex.hit
+        ? "<span class=\"tag\">" + esc(ex.hit) + "</span>"
+        : "<span class=\"tag tag-void\">nenhuma</span>") +
+      row("desporto", ex.sport
+        ? "<span class=\"tag\">" + esc(ex.sport) + "</span>"
+        : "<span class=\"tag tag-void\">null</span>") +
+      row("scope ativo", ex.folder
+        ? "<span class=\"tag tag-signal\">" + esc(ex.folder) + "</span>"
+        : "<span class=\"tag tag-void\">todas as pastas</span>") +
+      row("candidatos", ex.files
+        ? esc(ex.files)
+        : "<span class=\"tag tag-void\">&mdash;</span>") +
+      "<div class=\"trace-row\"><dt>nota</dt><dd style=\"font-family:var(--font-body);color:var(--ink-2);font-size:.9rem\">" + esc(ex.note) + "</dd></div>";
+  }
+
+  EXAMPLES.forEach(function (ex, idx) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = ex.label;
+    b.setAttribute("aria-pressed", idx === 0 ? "true" : "false");
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(chips.children, function (c) {
+        c.setAttribute("aria-pressed", "false");
+      });
+      b.setAttribute("aria-pressed", "true");
+      render(ex);
+    });
+    chips.appendChild(b);
+  });
+
+  render(EXAMPLES[0]);
+
+  /* ---------- reveals ---------- */
+
+  // Corre fn quando el entra no viewport. Se o observer nunca disparar
+  // (iframe sem scroll proprio, browser antigo), a rede de seguranca garante
+  // que o conteudo aparece na mesma passados 2.5s.
+  function whenVisible(el, fn) {
+    var done = false;
+    function once() { if (done) { return; } done = true; fn(); }
+
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { io.disconnect(); once(); }
+        });
+      }, { threshold: 0.3 });
+      io.observe(el);
+    }
+
+    setTimeout(once, 2500);
+  }
+
+  whenVisible(typed.closest(".mock"), function () { stream(typed, ANSWER); });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".stage"), function (el, i) {
+    whenVisible(el, function () {
+      setTimeout(function () { el.classList.add("in"); }, reduce ? 0 : i * 55);
+    });
+  });
+
+  whenVisible(document.getElementById("formula"), function () {
+    Array.prototype.forEach.call(document.querySelectorAll(".f-row"), function (r, i) {
+      var w = r.getAttribute("data-w") + "%";
+      setTimeout(function () { r.querySelector(".bar i").style.width = w; }, reduce ? 0 : 90 + i * 90);
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
