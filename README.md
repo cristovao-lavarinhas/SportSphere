@@ -1,222 +1,165 @@
-# SportSphere — React + Python
+# SportSphere
 
-📄 **Landing page:** [`docs/index.html`](docs/index.html) — página de apresentação do projeto, estática e sem dependências. Para a publicar, ativa o GitHub Pages em *Settings → Pages* com a source `main` / `/docs`.
+Assistente desportivo com RAG local — responde só a partir dos teus documentos.
 
-Assistente desportivo local com RAG sobre `local-docs/`, deteção automática
-de desporto, e respostas em streaming via Ollama. Arquitetura dividida em:
+**[site do SportSphere](https://cristovao-lavarinhas.github.io/SportSphere/)**
 
-- **`backend/`** — FastAPI. Toda a lógica de Python (RAG, scoring, histórico,
-  extração de ficheiros, gestão de documentos) portada do `streamlit_app.py`
-  original e expandida.
-- **`frontend/`** — React (Vite). UI com streaming em tempo real, tema
-  claro/escuro, Markdown, e gestão visual de documentos.
-- **`local-docs/`** — os documentos locais, versionados no repositório
-  (estrutura por desporto: `soccer/`, `basketball/`, `nfl/`, `tennis/`,
-  `cricket/`, `formula1/`, `olympics/`, mais qualquer pasta custom criada
-  pela UI).
+Pergunta em português sobre regulamentos, formatos de competição ou regras de
+jogo, e a resposta sai dos PDFs que tens em `local-docs/`:
+**pergunta → deteta o desporto → restringe à pasta certa → responde do que lá
+está.** Quando os documentos não cobrem o assunto, recusa em vez de inventar.
+Nada sai da máquina — o modelo corre localmente no Ollama e não há uma única
+chamada a uma API externa.
 
-## Porque dois processos?
+## Stack
 
-O React só corre no browser — não tem permissões para aceder a ficheiros
-locais ou chamar o Ollama diretamente. Por isso toda a lógica (RAG, OCR,
-chamadas ao modelo) vive no backend, que o frontend contacta via HTTP:
+React 18 · Vite 5 · FastAPI · Uvicorn · Ollama (qwen2.5:3b) · pypdf ·
+python-docx · Pillow + pytesseract · Docker Compose
 
-```
-React (frontend)  ->  FastAPI (backend)  ->  Ollama (modelo local)
-```
+## Arranque
 
-Há duas formas de correr isto: **Docker** (tudo orquestrado, recomendado)
-ou **manual** (três terminais, mais controlo/debug rápido). As duas
-funcionam com o mesmo código, só muda a forma de arrancar os processos.
-
----
-
-## Opção A — Docker (recomendado)
-
-Tudo corre dentro de containers: Ollama, backend e frontend. Não precisas
-de instalar Python, Node nem o Ollama no teu sistema.
-
-Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-instalado e a correr.
+Com o Docker Desktop a correr, não precisas de instalar Python, Node nem o
+Ollama no sistema:
 
 ```powershell
-# 1. Cria o ficheiro de histórico vazio (só na primeira vez,
-#    senão o Docker monta uma pasta em vez de um ficheiro)
-Set-Content backend\chat_history.json "[]"
-
-# 2. Constrói e arranca tudo (demora uns minutos na primeira vez)
+Set-Content backend\chat_history.json "[]"   # só na primeira vez
 docker compose up -d --build
-
-# 3. Puxa o modelo para dentro do container do Ollama (só na primeira vez)
 docker compose exec ollama ollama pull qwen2.5:3b
 ```
 
-Confirma que está no ar: `http://localhost:8000/api/health`
-
-Abre a app em: `http://localhost:5173`
-
-**Comandos úteis:**
+A app fica em http://localhost:5173 e o backend em http://localhost:8000/api/health.
+`local-docs/` e `backend/chat_history.json` são montados como volumes, por isso o
+que a app escreve sobrevive a um `docker compose down`.
 
 ```powershell
-docker compose logs -f backend     # ver logs em tempo real
-docker compose down                # parar tudo
-docker compose up -d --build       # reconstruir depois de alterares código
+docker compose logs -f backend    # logs em tempo real
+docker compose down               # parar tudo
 ```
 
-**Persistência:** `local-docs/` e `backend/chat_history.json` são montados
-como volumes — qualquer alteração feita pela app fica guardada no teu
-disco, mesmo que pares ou reconstruas os containers. O modelo do Ollama
-fica guardado no volume `ollama_data` (não precisas de repetir o `pull`
-a menos que apagues esse volume).
+Sem Docker são três terminais — `ollama serve`, `uvicorn main:app --reload --port 8000`
+em `backend/` (com o venv e o `requirements.txt` instalados), e `npm run dev` em
+`frontend/`. O Ollama tem de arrancar **antes** do backend, senão o modelo aparece
+como offline. Neste modo o OCR de imagens precisa do binário do Tesseract instalado
+no sistema; sem ele cai para o modelo de visão do Ollama.
 
----
+## Ecrãs
 
-## Opção B — Manual (sem Docker)
+| Ecrã | O que faz |
+| --- | --- |
+| Chat | Resposta em streaming, Markdown, copiar, editar e reenviar, parar a meio, e o painel "a consultar: …" com os excertos que entraram no prompt |
+| Documentos | Gerir `local-docs/` sem tocar no disco — criar pastas, carregar e apagar ficheiros |
+| Arquitetura | Página dentro da app a explicar o RAG, o OCR e o pipeline |
 
-Útil para debug rápido (sem rebuild de imagem a cada alteração) ou se
-preferires não usar Docker.
+A sidebar guarda as conversas recentes, alterna o tema e mostra o estado do
+modelo (nome e se está disponível).
 
-### 1. Ollama (obrigatório antes de tudo)
+## API
 
-O Ollama tem de estar a correr **antes** de arrancar o backend, caso contrário
-o modelo aparece como OFFLINE na app.
+| Endpoint | O que faz |
+| --- | --- |
+| `GET /api/health` | `{ollama_available, model}` |
+| `POST /api/chat` | Resposta em SSE: um evento `scope`, depois `token` por cada pedaço, e um `done` com o id e o título da conversa |
+| `GET /api/history` · `DELETE /api/history/{id}` | Conversas guardadas |
+| `POST /api/upload` | Extrai texto de um ficheiro anexado a uma pergunta |
+| `GET /api/docs` | Biblioteca local, por pasta |
+| `POST /api/docs/folders` · `DELETE /api/docs/folders/{folder}` | Criar e apagar pastas |
+| `POST /api/docs/{folder}/upload` · `DELETE /api/docs/{folder}/{filename}` | Ficheiros dentro de uma pasta |
 
-```bash
-ollama serve
-```
+CORS aceita `localhost` e `127.0.0.1` nas portas 5173–5175, porque o Vite avança
+de porta quando encontra uma ocupada.
 
-Deixa este terminal **sempre aberto**. Noutro terminal, instala o modelo se
-ainda não o tiveres:
+## Arquitetura
 
-```bash
-ollama pull qwen2.5:3b
-```
-
-### 2. Backend
-
-Noutro terminal:
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env            # ajusta OLLAMA_MODEL / LOCAL_DOCS_PATH se preciso
-uvicorn main:app --reload --port 8000
-```
-
-Confirma que está no ar: `http://127.0.0.1:8000/api/health`
-
-> Nota: a extração de texto de imagens (OCR) usa `pytesseract`, que precisa
-> do binário Tesseract instalado no sistema (não só do pacote Python).
-> Se correres sem Docker, instala-o separadamente — caso contrário o OCR
-> cai automaticamente para o fallback de modelo de visão via Ollama.
-
-### 3. Frontend
-
-Noutro terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Abre o URL que o Vite mostrar (normalmente `http://localhost:5173`; se
-a porta estiver ocupada, o Vite avança para 5174/5175 automaticamente —
-o backend já aceita CORS dessas três portas).
-
----
-
-## Estrutura
+O React só desenha — no browser não há permissões para ler ficheiros locais nem
+falar com o Ollama. Toda a lógica vive no backend:
 
 ```
-SportSphere/
-├── .gitignore
-├── docker-compose.yml      # orquestra ollama + backend + frontend
-├── docs/
-│   └── index.html          # landing page do projeto (GitHub Pages)
-├── backend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── main.py            # endpoints FastAPI (chat SSE, historico, upload,
-│   │                         health, gestao de documentos)
-│   ├── rag.py              # RAG, scoring, deteção de desporto, system
-│   │                         prompt, streaming Ollama, cache de indice (60s)
-│   ├── docs_manager.py     # listar/criar/apagar pastas e ficheiros de
-│   │                         local-docs/ a partir da UI
-│   ├── file_extraction.py  # PDF / DOCX / OCR de imagens (uploads do utilizador)
-│   ├── storage.py          # historico de conversas em chat_history.json
-│   └── requirements.txt
-├── frontend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── index.html
-│   └── src/
-│       ├── App.jsx                 # estado global, troca entre as 3 views
-│       ├── api.js                  # fetch + parsing do streaming SSE
-│       ├── index.css               # tokens de tema (claro/escuro), base
-│       ├── assets/
-│       │   ├── logo.png            # logo para fundos claros
-│       │   └── logo-dark.png       # logo para a sidebar (sempre escura)
-│       └── components/
-│           ├── Sidebar.jsx/css      # nova conversa, historico, navegacao,
-│           │                          toggle de tema, estado do modelo
-│           ├── Welcome.jsx/css      # ecra inicial com sugestoes
-│           ├── ChatPanel.jsx/css    # mensagens (Markdown), copiar,
-│           │                          editar/reenviar, parar, ver fontes
-│           ├── InputBar.jsx/css     # input + anexar + enviar/parar
-│           ├── Architecture.jsx/css # pagina "Arquitetura do Sistema"
-│           └── DocsLibrary.jsx/css  # pagina "Documentos Locais"
-└── local-docs/              # documentos por desporto (versionados no Git)
+React (:5173)  ->  FastAPI (:8000)  ->  Ollama (:11434)
 ```
 
-## Funcionalidades principais
+```
+backend/
+  main.py             endpoints (chat SSE, histórico, upload, gestão de documentos)
+  rag.py              deteção de desporto, indexação, scoring, system prompt, streaming
+  docs_manager.py     pastas e ficheiros de local-docs/ a partir da UI
+  file_extraction.py  PDF, DOCX e OCR de imagens para uploads do utilizador
+  storage.py          histórico em chat_history.json
+frontend/src/
+  App.jsx             estado global e troca entre as três views
+  api.js              fetch + parsing do streaming SSE
+  index.css           tokens de tema (claro/escuro)
+  components/         Sidebar, Welcome, ChatPanel, InputBar, Architecture, DocsLibrary
+local-docs/           regulamentos por desporto, versionados no repo
+docs/index.html       landing page do projeto
+```
 
-### Chat
+### Deteção de desporto
 
-- Streaming token a token via **Server-Sent Events**
-- Respostas em **Markdown** (listas, negrito, código, tabelas)
-- **Copiar** resposta com um clique
-- **Editar e reenviar** mensagens próprias (corta a conversa a partir daí)
-- **Parar geração** a meio — o texto já gerado fica guardado no histórico
-- **"a consultar: ..."** expansível, mostra os excertos exatos de cada
-  ficheiro usados para construir a resposta
-- Recusa de forma consistente quando não há contexto suficiente (frase fixa
-  controlada pelo backend, não depende do modelo cumprir a instrução)
+Antes de procurar, o backend passa a pergunta por listas de keywords em português
+e inglês sobre o texto normalizado (Unicode NFKD, sem acentos). O desporto que
+sai daí escolhe uma pasta de `local-docs/`, e só essa entra na busca.
 
-### Documentos (`/api/docs`)
+A ordem das listas conta: `Football` (NFL) é testado **antes** de `Soccer`, porque
+"futebol americano" contém "futebol" e o primeiro match ganha. Para pastas fora
+da lista — como `hoquei-no-gelo`, criada pela UI — o scope força-se à mão
+escrevendo `[folders: hoquei-no-gelo]` na própria mensagem.
 
-- Ecrã próprio para gerir `local-docs/` sem mexer manualmente nas pastas
-- Adicionar/apagar ficheiros por desporto
-- Criar pastas novas (desportos fora da lista original)
-- Apagar pastas custom (as 7 pastas originais não podem ser apagadas —
-  estão ligadas à deteção automática de desporto em `rag.py`)
-- Cache de indexação do RAG invalidada automaticamente a cada alteração
+### Retrieval
 
-### Arquitetura
+Não há vector store nem modelo de embeddings. Cada ficheiro é partido em blocos
+de **900 caracteres com 150 de sobreposição**, tokenizado uma vez, e o índice
+fica em cache 60 segundos — invalidada sempre que a app mexe nos documentos.
 
-- Página dentro da própria app a explicar o sistema (RAG, OCR, pipeline,
-  tech stack), recriada a partir da versão antiga em Streamlit
+A relevância de cada bloco é uma soma ponderada de quatro sinais lexicais:
 
-### Tema
+| Sinal | Peso |
+| --- | --- |
+| Similaridade léxica, `#(q ∩ c) / √(#q · #c)` | 0.65 |
+| Cobertura da query | 0.15 |
+| Bigramas em comum | 0.15 |
+| Tokens do nome do ficheiro | 0.05 |
+| Bónus de frase exata (aditivo) | +0.10 |
 
-- Claro/escuro com toggle na sidebar, preferência guardada no browser
-- Sidebar permanece sempre escura (âncora visual fixa); o resto da app
-  muda consoante o tema escolhido
+O trade-off é assumido: um scorer lexical falha sinónimos que embeddings
+apanhariam. Para recuperar parte disso, a pergunta é traduzida PT→EN pelo próprio
+Ollama e os tokens das duas línguas são unidos antes da busca — é o que permite
+acertar em documentos ingleses a partir de perguntas em português.
 
-## Notas técnicas
+Os 10 melhores blocos seguem para o prompt. Os excertos exatos vão também para o
+frontend no evento `scope`, que é o que alimenta o "a consultar: …".
 
-- CORS no backend aceita `localhost`/`127.0.0.1` nas portas 5173–5175
-  (válido tanto em modo Docker como manual, já que o frontend Docker está
-  mapeado para a porta 5173 do host)
-- O histórico de chat continua em `backend/chat_history.json` (fora do Git;
-  em Docker é montado como volume, por isso persiste entre `docker compose down/up`)
-- A "scope" (pasta de `local-docs` ativa) é auto-detetada pelo desporto
-  mencionado na pergunta, ou via `[folders: soccer]` na mensagem
-- Limite de 5MB por ficheiro e tipos suportados: PDF, DOCX, TXT, MD, CSV,
-  JSON, HTML, XML, YAML, RTF, e imagens (com OCR via Tesseract → Ollama
-  Vision em cascata)
-- Em modo Docker, as variáveis de ambiente (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
-  etc.) são definidas no `docker-compose.yml`, não no `.env` — o `.env`
-  continua a ser usado apenas no modo manual
+### Modo estrito
+
+Com `LOCAL_RAG_STRICT_ONLY=true` (o default), o system prompt proíbe conhecimento
+externo e fixa a frase de recusa: *"Não encontrei essa informação nos meus
+ficheiros locais."* A regra está no backend, não fica à mercê de o modelo cumprir
+a instrução.
+
+### Ingestão
+
+PDF via pypdf, DOCX via python-docx, e leitura direta para `.txt`, `.md`, `.csv`,
+`.tsv`, `.json`, `.jsonl`, `.html`, `.xml`, `.yaml` e `.rtf`. Imagens tentam o
+Tesseract primeiro e caem para o modelo de visão do Ollama se ele não estiver
+instalado. Limite de 5 MB por ficheiro.
+
+### Persistência
+
+O histórico são as últimas 10 conversas em `backend/chat_history.json`, com o
+título tirado dos primeiros 40 caracteres da primeira mensagem. A conversa é
+gravada no `finally` do stream, por isso o texto já gerado fica guardado mesmo
+que carregues em "Parar" ou a ligação caia. As sete pastas de desporto
+incorporadas não podem ser apagadas pela UI — a deteção automática depende delas.
+
+## Landing page
+
+`docs/index.html` é um ficheiro único, estático, sem framework nem build step. O
+mockup da interface é recriado em markup em vez de ser um screenshot, por isso
+não fica desatualizado. O GitHub Pages serve a pasta `/docs` do `main`.
+
+## Design
+
+Sistema "Kinetic High-Performance": tokens definidos uma vez em
+`frontend/src/index.css` e trocados por tema, azul `#0066ff` como acento e um
+lime `#c3f400` reservado a sinais de estado. Claro e escuro com toggle na
+sidebar, preferência guardada no browser — mas a sidebar mantém-se sempre escura
+nos dois temas, como âncora visual fixa.
